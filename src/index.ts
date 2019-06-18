@@ -1,8 +1,11 @@
+#!/usr/bin/env node
+
+import program from 'commander'
 import fs from 'fs'
 import ini from 'ini'
 import os from 'os'
 import puppeteer from 'puppeteer'
-import readline from 'readline-sync';
+import readline from 'readline-sync'
 import { STS } from 'aws-sdk'
 
 const CREDENTIALS_FILE = os.homedir() + '/.aws/credentials'
@@ -20,12 +23,21 @@ function parsePost(postData: string|undefined): any {
 
 
 (async () => {
+  program
+    // @Matt TODO: match up to package.json version
+    .version('0.0.0')
+    // @Matt TODO: matchup to package.json description
+    .description('A simple cli utility to get temporary AWS credentials via a SAML endpoint')
+    .arguments('<login_url>')
+  program.parse(process.argv)
+
   const args = process.argv.slice(2)
-  const url = args[0]
-  if (!url) {
-    console.log('Need a url as the first parameter')
+  if (!args.length) {
+    program.outputHelp()
     process.exit(1)
   }
+
+  const loginUrl = args[0]
 
   const browser = await puppeteer.launch({
     headless: false,
@@ -56,7 +68,6 @@ function parsePost(postData: string|undefined): any {
       roles.forEach((r, i) => console.log(`${i}: ${r.role}`))
       console.log(' ')
 
-      // @Matt TODO: select which role to use via cli
       const selection = readline.question('Which role do you want to use? ')
       const selectedRole = roles[parseInt(selection)]
 
@@ -90,7 +101,6 @@ function parsePost(postData: string|undefined): any {
       }
       console.log(' ')
 
-      // @Matt TODO: make this a selection or creation
       const profile = readline.question('Profile you would like to update (or create): ')
       credentials = Object.assign(credentials, { [profile]: {
         aws_access_key_id: resp.Credentials!.AccessKeyId,
@@ -107,5 +117,5 @@ function parsePost(postData: string|undefined): any {
     req.continue()
   })
 
-  page.goto(url)
+  page.goto(loginUrl!)
 })();
