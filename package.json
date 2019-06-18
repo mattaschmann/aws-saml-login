@@ -1,6 +1,6 @@
 {
   "name": "aws-saml-login",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Utility to login to AWS via SAML and get temporary credentials",
   "main": "./dist/index.js",
   "bin": {

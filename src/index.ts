@@ -25,7 +25,7 @@ function parsePost(postData: string|undefined): any {
 (async () => {
   program
     // @Matt TODO: match up to package.json version
-    .version('0.0.0')
+    .version('0.0.1')
     // @Matt TODO: matchup to package.json description
     .description('A simple cli utility to get temporary AWS credentials via a SAML endpoint')
     .arguments('<login_url>')
