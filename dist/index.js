@@ -32,7 +32,7 @@ function parsePost(postData) {
 (() => __awaiter(this, void 0, void 0, function* () {
     commander_1.default
         // @Matt TODO: match up to package.json version
-        .version('0.0.1')
+        .version('0.0.2')
         // @Matt TODO: matchup to package.json description
         .description('A simple cli utility to get temporary AWS credentials via a SAML endpoint')
         .arguments('<login_url>');
