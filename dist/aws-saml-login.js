@@ -11,6 +11,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const safe_1 = __importDefault(require("colors/safe"));
 const fs_1 = __importDefault(require("fs"));
 const ini_1 = __importDefault(require("ini"));
 const os_1 = __importDefault(require("os"));
@@ -67,7 +68,7 @@ class AWSSamlLogin {
                         return { principal, role };
                     });
                     console.log('\nAvailable roles:\n');
-                    roles.forEach((r, i) => console.log(`${i}: ${r.role}`));
+                    roles.forEach((r, i) => console.log(`${safe_1.default.cyan(i.toString())}: ${r.role}`));
                     console.log(' ');
                     const selection = readline_sync_1.default.question('Which role do you want to use? ');
                     const selectedRole = roles[parseInt(selection, 10)];
@@ -85,7 +86,7 @@ class AWSSamlLogin {
                         console.log('Invalid response from AWS!');
                         process.exit(1);
                     }
-                    console.log(' ');
+                    console.log('\nAWS Response:');
                     console.log(resp);
                     console.log(' ');
                     let credentials = {};
@@ -100,8 +101,7 @@ class AWSSamlLogin {
                     }
                     if (profiles.length > 0) {
                         console.log('Here are your existing profiles:\n');
-                        // @Matt TODO: color these?
-                        profiles.forEach((p) => console.log(p));
+                        profiles.forEach((p) => console.log(safe_1.default.cyan(p)));
                     }
                     else {
                         console.log('No profiles found');
@@ -113,7 +113,8 @@ class AWSSamlLogin {
                             aws_session_token: resp.Credentials.SessionToken,
                         } });
                     fs_1.default.writeFileSync(CREDENTIALS_FILE, ini_1.default.stringify(credentials));
-                    console.log(`\nProfile '${profile}' updated with credentials\n`);
+                    // @Matt TODO: output ttl when we have it, in human form?
+                    console.log(`\nProfile '${safe_1.default.cyan(profile)}' updated with credentials\n`);
                     console.log('Remember to update your region information in "~/.aws/config"');
                     console.log('see: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html');
                 }

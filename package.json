@@ -19,6 +19,7 @@
   "license": "ISC",
   "dependencies": {
     "aws-sdk": "2.476.0",
+    "colors": "1.3.3",
     "commander": "2.20.0",
     "ini": "1.3.5",
     "puppeteer": "1.17.0",
