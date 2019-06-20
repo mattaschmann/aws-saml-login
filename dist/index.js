@@ -19,7 +19,9 @@ const os_1 = __importDefault(require("os"));
 const puppeteer_1 = __importDefault(require("puppeteer"));
 const readline_sync_1 = __importDefault(require("readline-sync"));
 const aws_sdk_1 = require("aws-sdk");
+const pjson = require('../package.json');
 const CREDENTIALS_FILE = os_1.default.homedir() + '/.aws/credentials';
+// @Matt TODO: current turn this into class, move into other file, minimize cli.ts file
 function parsePost(postData) {
     if (!postData)
         return {};
@@ -30,19 +32,17 @@ function parsePost(postData) {
     }, {});
 }
 (() => __awaiter(this, void 0, void 0, function* () {
+    let loginUrl = '';
     commander_1.default
-        // @Matt TODO: match up to package.json version
-        .version('0.0.2')
-        // @Matt TODO: matchup to package.json description
-        .description('A simple cli utility to get temporary AWS credentials via a SAML endpoint')
-        .arguments('<login_url>');
+        .version(pjson.version)
+        .description(pjson.description)
+        .arguments('<login_url>')
+        .action((login_url) => loginUrl = login_url);
     commander_1.default.parse(process.argv);
-    const args = process.argv.slice(2);
-    if (!args.length) {
+    if (!commander_1.default.args.length) {
         commander_1.default.outputHelp();
         process.exit(1);
     }
-    const loginUrl = args[0];
     const browser = yield puppeteer_1.default.launch({
         headless: false,
     });

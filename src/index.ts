@@ -8,8 +8,11 @@ import puppeteer from 'puppeteer'
 import readline from 'readline-sync'
 import { STS } from 'aws-sdk'
 
+const pjson = require('../package.json')
+
 const CREDENTIALS_FILE = os.homedir() + '/.aws/credentials'
 
+// @Matt TODO: current turn this into class, move into other file, minimize cli.ts file
 function parsePost(postData: string|undefined): any {
   if (!postData) return {}
 
@@ -23,21 +26,18 @@ function parsePost(postData: string|undefined): any {
 
 
 (async () => {
+  let loginUrl = ''
   program
-    // @Matt TODO: match up to package.json version
-    .version('0.0.2')
-    // @Matt TODO: matchup to package.json description
-    .description('A simple cli utility to get temporary AWS credentials via a SAML endpoint')
+    .version(pjson.version)
+    .description(pjson.description)
     .arguments('<login_url>')
+    .action((login_url) => loginUrl = login_url)
   program.parse(process.argv)
 
-  const args = process.argv.slice(2)
-  if (!args.length) {
+  if (!program.args.length) {
     program.outputHelp()
     process.exit(1)
   }
-
-  const loginUrl = args[0]
 
   const browser = await puppeteer.launch({
     headless: false,
