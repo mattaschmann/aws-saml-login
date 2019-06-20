@@ -26,6 +26,7 @@ class AWSSamlLogin {
   private loginUrl: string = ''
 
   constructor(args: string[]) {
+    // @Matt TODO: add an ttl argument?
     program
       .version(pjson.version)
       .description(pjson.description)
@@ -93,18 +94,27 @@ class AWSSamlLogin {
         console.log(resp)
         console.log(' ')
 
-        // @Matt TODO: create if not found?
-        let credentials = ini.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf-8'))
+        let credentials = {}
+        if (fs.existsSync(CREDENTIALS_FILE)) {
+          credentials = ini.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf-8'))
+        }
 
-        console.log('Here are your existing profiles:\n')
+        const profiles = []
         for (const key in credentials) {
           if (credentials.hasOwnProperty(key)) {
-            console.log(key)
+            profiles.push(key)
           }
         }
-        console.log(' ')
 
-        const profile = readline.question('Profile you would like to update (or create): ')
+        if (profiles.length > 0) {
+          console.log('Here are your existing profiles:\n')
+          // @Matt TODO: color these?
+          profiles.forEach((p) => console.log(p))
+        } else {
+          console.log('No profiles found')
+        }
+
+        const profile = readline.question('\nProfile you would like to update (or create): ')
         credentials = Object.assign(credentials, { [profile]: {
           aws_access_key_id: resp.Credentials!.AccessKeyId,
           aws_secret_access_key: resp.Credentials!.SecretAccessKey,
@@ -113,13 +123,14 @@ class AWSSamlLogin {
 
         fs.writeFileSync(CREDENTIALS_FILE, ini.stringify(credentials))
         console.log(`\nProfile '${profile}' updated with credentials\n`)
-        console.log('Remember to update the region information for this profile in "~/.aws/config"')
+        console.log('Remember to update your region information in "~/.aws/config"')
         console.log('see: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html')
       }
 
       req.continue()
     })
 
+    // @Matt TODO: figure out error handle
     page.goto(this.loginUrl)
   }
 }

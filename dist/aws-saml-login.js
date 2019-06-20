@@ -23,6 +23,7 @@ const CREDENTIALS_FILE = os_1.default.homedir() + '/.aws/credentials';
 class AWSSamlLogin {
     constructor(args) {
         this.loginUrl = '';
+        // @Matt TODO: add an ttl argument?
         commander_1.default
             .version(pjson.version)
             .description(pjson.description)
@@ -87,16 +88,25 @@ class AWSSamlLogin {
                     console.log(' ');
                     console.log(resp);
                     console.log(' ');
-                    // @Matt TODO: create if not found?
-                    let credentials = ini_1.default.parse(fs_1.default.readFileSync(CREDENTIALS_FILE, 'utf-8'));
-                    console.log('Here are your existing profiles:\n');
+                    let credentials = {};
+                    if (fs_1.default.existsSync(CREDENTIALS_FILE)) {
+                        credentials = ini_1.default.parse(fs_1.default.readFileSync(CREDENTIALS_FILE, 'utf-8'));
+                    }
+                    const profiles = [];
                     for (const key in credentials) {
                         if (credentials.hasOwnProperty(key)) {
-                            console.log(key);
+                            profiles.push(key);
                         }
                     }
-                    console.log(' ');
-                    const profile = readline_sync_1.default.question('Profile you would like to update (or create): ');
+                    if (profiles.length > 0) {
+                        console.log('Here are your existing profiles:\n');
+                        // @Matt TODO: color these?
+                        profiles.forEach((p) => console.log(p));
+                    }
+                    else {
+                        console.log('No profiles found');
+                    }
+                    const profile = readline_sync_1.default.question('\nProfile you would like to update (or create): ');
                     credentials = Object.assign(credentials, { [profile]: {
                             aws_access_key_id: resp.Credentials.AccessKeyId,
                             aws_secret_access_key: resp.Credentials.SecretAccessKey,
@@ -104,11 +114,12 @@ class AWSSamlLogin {
                         } });
                     fs_1.default.writeFileSync(CREDENTIALS_FILE, ini_1.default.stringify(credentials));
                     console.log(`\nProfile '${profile}' updated with credentials\n`);
-                    console.log('Remember to update the region information for this profile in "~/.aws/config"');
+                    console.log('Remember to update your region information in "~/.aws/config"');
                     console.log('see: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html');
                 }
                 req.continue();
             }));
+            // @Matt TODO: figure out error handle
             page.goto(this.loginUrl);
         });
     }
