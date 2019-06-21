@@ -69,7 +69,7 @@ class AWSSamlLogin {
                         const [principal, role] = r.split(',');
                         return { principal, role };
                     });
-                    console.log('\nAvailable roles:\n');
+                    console.log('\nAvailable roles:');
                     roles.forEach((r, i) => console.log(`${safe_1.default.cyan(i.toString())}: ${r.role}`));
                     console.log(' ');
                     const selection = readline_sync_1.default.question('Which role do you want to use? ');
@@ -112,7 +112,7 @@ class AWSSamlLogin {
                         }
                     }
                     if (profiles.length > 0) {
-                        console.log('Here are your existing profiles:\n');
+                        console.log('Existing profiles:');
                         profiles.forEach((p) => console.log(safe_1.default.cyan(p)));
                     }
                     else {
@@ -125,9 +125,10 @@ class AWSSamlLogin {
                             aws_session_token: resp.Credentials.SessionToken,
                         } });
                     fs_1.default.writeFileSync(CREDENTIALS_FILE, ini_1.default.stringify(credentials));
-                    // @Matt TODO: output ttl when we have it, in human form?
-                    console.log(`\nProfile '${safe_1.default.cyan(profile)}' updated with credentials\n`);
-                    console.log('Remember to update your region information in "~/.aws/config"');
+                    const expiration = new Date(resp.Credentials.Expiration);
+                    console.log(`\nProfile '${safe_1.default.cyan(profile)}' updated with credentials`);
+                    console.log('Expires: ', safe_1.default.green(expiration.toString()));
+                    console.log('\nRemember to update your region information in "~/.aws/config"');
                     console.log('see: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html');
                 }
                 req.continue();

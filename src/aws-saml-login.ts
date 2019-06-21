@@ -70,7 +70,7 @@ class AWSSamlLogin {
             return { principal, role }
           })
 
-        console.log('\nAvailable roles:\n')
+        console.log('\nAvailable roles:')
         roles.forEach((r, i) => console.log(`${colors.cyan(i.toString())}: ${r.role}`))
         console.log(' ')
 
@@ -120,7 +120,7 @@ class AWSSamlLogin {
         }
 
         if (profiles.length > 0) {
-          console.log('Here are your existing profiles:\n')
+          console.log('Existing profiles:')
           profiles.forEach((p) => console.log(colors.cyan(p)))
         } else {
           console.log('No profiles found')
@@ -134,9 +134,10 @@ class AWSSamlLogin {
         }})
 
         fs.writeFileSync(CREDENTIALS_FILE, ini.stringify(credentials))
-        // @Matt TODO: output ttl when we have it, in human form?
-        console.log(`\nProfile '${colors.cyan(profile)}' updated with credentials\n`)
-        console.log('Remember to update your region information in "~/.aws/config"')
+        const expiration = new Date(resp.Credentials!.Expiration)
+        console.log(`\nProfile '${colors.cyan(profile)}' updated with credentials`)
+        console.log('Expires: ', colors.green(expiration.toString()))
+        console.log('\nRemember to update your region information in "~/.aws/config"')
         console.log('see: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html')
       }
 
