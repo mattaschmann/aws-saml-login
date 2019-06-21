@@ -25,20 +25,23 @@ class AWSSamlLogin {
   }
 
   private loginUrl: string = ''
+  private duration: number = 3600
 
   constructor(args: string[]) {
-    // @Matt TODO: add an ttl argument?
     program
       .version(pjson.version)
       .description(pjson.description)
+      .option('-d, --duration <secs>', 'session duration in seconds', '3600')
       .arguments('<login_url>')
-      .action((url) => this.loginUrl = url)
     program.parse(args)
 
     if (!program.args.length) {
       program.outputHelp()
-      process.exit(1)
+      process.exit(0)
     }
+
+    this.duration = parseInt(program.duration, 10)
+    this.loginUrl = program.args[0]
   }
 
   public async login() {
@@ -80,11 +83,20 @@ class AWSSamlLogin {
         }
 
         const sts = new STS()
-        const resp = await sts.assumeRoleWithSAML({
-          PrincipalArn: selectedRole.principal,
-          RoleArn: selectedRole.role,
-          SAMLAssertion: post.SAMLResponse,
-        }).promise()
+        let resp: STS.Types.AssumeRoleWithSAMLResponse = {}
+        try {
+          resp = await sts.assumeRoleWithSAML({
+            DurationSeconds: this.duration,
+            PrincipalArn: selectedRole.principal,
+            RoleArn: selectedRole.role,
+            SAMLAssertion: post.SAMLResponse,
+          }).promise()
+        } catch (err) {
+          console.log('\n' + colors.red(err.code))
+          console.log(err.message)
+          console.log('see: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/STS.html#assumeRoleWithSAML-property')
+          process.exit(1)
+        }
 
         if (!resp.Credentials) {
           console.log('Invalid response from AWS!')

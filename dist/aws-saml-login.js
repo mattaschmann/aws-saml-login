@@ -24,17 +24,19 @@ const CREDENTIALS_FILE = os_1.default.homedir() + '/.aws/credentials';
 class AWSSamlLogin {
     constructor(args) {
         this.loginUrl = '';
-        // @Matt TODO: add an ttl argument?
+        this.duration = 3600;
         commander_1.default
             .version(pjson.version)
             .description(pjson.description)
-            .arguments('<login_url>')
-            .action((url) => this.loginUrl = url);
+            .option('-d, --duration <secs>', 'session duration in seconds', '3600')
+            .arguments('<login_url>');
         commander_1.default.parse(args);
         if (!commander_1.default.args.length) {
             commander_1.default.outputHelp();
-            process.exit(1);
+            process.exit(0);
         }
+        this.duration = parseInt(commander_1.default.duration, 10);
+        this.loginUrl = commander_1.default.args[0];
     }
     static parsePost(postData) {
         if (!postData) {
@@ -77,11 +79,21 @@ class AWSSamlLogin {
                         process.exit(1);
                     }
                     const sts = new aws_sdk_1.STS();
-                    const resp = yield sts.assumeRoleWithSAML({
-                        PrincipalArn: selectedRole.principal,
-                        RoleArn: selectedRole.role,
-                        SAMLAssertion: post.SAMLResponse,
-                    }).promise();
+                    let resp = {};
+                    try {
+                        resp = yield sts.assumeRoleWithSAML({
+                            DurationSeconds: this.duration,
+                            PrincipalArn: selectedRole.principal,
+                            RoleArn: selectedRole.role,
+                            SAMLAssertion: post.SAMLResponse,
+                        }).promise();
+                    }
+                    catch (err) {
+                        console.log('\n' + safe_1.default.red(err.code));
+                        console.log(err.message);
+                        console.log('see: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/STS.html#assumeRoleWithSAML-property');
+                        process.exit(1);
+                    }
                     if (!resp.Credentials) {
                         console.log('Invalid response from AWS!');
                         process.exit(1);
