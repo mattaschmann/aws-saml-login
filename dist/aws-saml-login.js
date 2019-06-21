@@ -133,8 +133,13 @@ class AWSSamlLogin {
                 }
                 req.continue();
             }));
-            // @Matt TODO: figure out error handle
-            page.goto(this.loginUrl);
+            try {
+                yield page.goto(this.loginUrl);
+            }
+            catch (err) {
+                console.error(err.message);
+                process.exit(1);
+            }
         });
     }
 }
