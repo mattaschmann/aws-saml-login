@@ -20,25 +20,48 @@ const puppeteer_1 = __importDefault(require("puppeteer"));
 const readline_sync_1 = __importDefault(require("readline-sync"));
 const aws_sdk_1 = require("aws-sdk");
 const pjson = require('../package.json');
-const CREDENTIALS_FILE = os_1.default.homedir() + '/.aws/credentials';
+const CREDENTIALS_FILE_PATH = os_1.default.homedir() + '/.aws';
+const CREDENTIALS_FILE = CREDENTIALS_FILE_PATH + '/credentials';
+const CONFIG_FILE_PATH = os_1.default.homedir() + '/.config/aws-saml-login';
+const CONFIG_FILE = CONFIG_FILE_PATH + '/config';
 class AWSSamlLogin {
     constructor(args) {
-        this.loginUrl = '';
+        this.role = '';
+        this.principal = '';
         this.duration = 3600;
+        this.config = {};
+        this.profileConfig = {};
         commander_1.default
             .version(pjson.version)
             .description(pjson.description)
             .option('-d, --duration <secs>', 'session duration in seconds', '3600')
             .option('-p, --profile <profile_name>', 'default profile to use')
+            .option('-r, --refresh <profile_name>', `attempts to refresh an existing profile using config options saved
+                              in "~/.config/aws-saml-login/config".  Will create the entry if it
+                              does not exist.\n`)
             .arguments('<login_url>');
         commander_1.default.parse(args);
-        if (!commander_1.default.args.length) {
+        if (!commander_1.default.args.length && !commander_1.default.refresh) {
             commander_1.default.outputHelp();
             process.exit(0);
         }
         this.duration = parseInt(commander_1.default.duration, 10);
         this.profile = commander_1.default.profile;
+        this.refresh = commander_1.default.refresh;
         this.loginUrl = commander_1.default.args[0];
+        if (this.refresh) {
+            this.profile = this.refresh;
+            if (fs_1.default.existsSync(CONFIG_FILE)) {
+                this.config = ini_1.default.parse(fs_1.default.readFileSync(CONFIG_FILE, 'utf-8'));
+                this.profileConfig = this.config[this.refresh];
+                this.loginUrl = this.profileConfig.loginUrl;
+                this.role = this.profileConfig.role;
+                this.principal = this.profileConfig.principal;
+            }
+            if (!this.loginUrl) {
+                this.loginUrl = readline_sync_1.default.question('\nLogin URL: ');
+            }
+        }
     }
     static parsePost(postData) {
         if (!postData) {
@@ -62,31 +85,35 @@ class AWSSamlLogin {
                 const post = AWSSamlLogin.parsePost(req.postData());
                 if (post.SAMLResponse) {
                     yield browser.close();
-                    const decoded = Buffer
-                        .from(post.SAMLResponse, 'base64')
-                        .toString('ascii');
-                    const roles = decoded
-                        .match(/arn:aws:iam.+?(?=<)/g)
-                        .map((r) => {
-                        const [principal, role] = r.split(',');
-                        return { principal, role };
-                    });
-                    console.log('\nAvailable roles:');
-                    roles.forEach((r, i) => console.log(`${safe_1.default.cyan(i.toString())}: ${r.role}`));
-                    console.log(' ');
-                    const selection = readline_sync_1.default.question('Which role do you want to use? ');
-                    const selectedRole = roles[parseInt(selection, 10)];
-                    if (!selectedRole) {
-                        console.log('You did not select one of the available roles!');
-                        process.exit(1);
+                    if (!this.role || !this.principal) {
+                        const decoded = Buffer
+                            .from(post.SAMLResponse, 'base64')
+                            .toString('ascii');
+                        const roles = decoded
+                            .match(/arn:aws:iam.+?(?=<)/g)
+                            .map((i) => {
+                            const [p, r] = i.split(',');
+                            return { principal: p, role: r };
+                        });
+                        console.log('\nAvailable roles:');
+                        roles.forEach((r, i) => console.log(`${safe_1.default.cyan(i.toString())}: ${r.role}`));
+                        console.log(' ');
+                        const selection = readline_sync_1.default.question('Which role do you want to use? ');
+                        const { role, principal } = roles[parseInt(selection, 10)];
+                        this.role = role;
+                        this.principal = principal;
+                        if (!this.role || !this.principal) {
+                            console.log('You did not select one of the available roles!');
+                            process.exit(1);
+                        }
                     }
                     const sts = new aws_sdk_1.STS();
                     let resp = {};
                     try {
                         resp = yield sts.assumeRoleWithSAML({
                             DurationSeconds: this.duration,
-                            PrincipalArn: selectedRole.principal,
-                            RoleArn: selectedRole.role,
+                            PrincipalArn: this.principal,
+                            RoleArn: this.role,
                             SAMLAssertion: post.SAMLResponse,
                         }).promise();
                     }
@@ -123,17 +150,30 @@ class AWSSamlLogin {
                         }
                         this.profile = readline_sync_1.default.question('\nProfile you would like to update (or create): ');
                     }
-                    credentials = Object.assign(credentials, { [this.profile]: {
+                    credentials = Object.assign(credentials, {
+                        [this.profile]: {
                             aws_access_key_id: resp.Credentials.AccessKeyId,
                             aws_secret_access_key: resp.Credentials.SecretAccessKey,
                             aws_session_token: resp.Credentials.SessionToken,
-                        } });
+                        },
+                    });
+                    fs_1.default.mkdirSync(CREDENTIALS_FILE_PATH, { recursive: true });
                     fs_1.default.writeFileSync(CREDENTIALS_FILE, ini_1.default.stringify(credentials));
                     const expiration = new Date(resp.Credentials.Expiration);
                     console.log(`\nProfile '${safe_1.default.cyan(this.profile)}' updated with credentials`);
                     console.log('Expires: ', safe_1.default.green(expiration.toString()));
                     console.log('\nRemember to update your region information in "~/.aws/config"');
                     console.log('see: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html');
+                    // Write to config if we are refreshing
+                    if (this.refresh) {
+                        this.config[this.refresh] = {
+                            loginUrl: this.loginUrl,
+                            principal: this.principal,
+                            role: this.role,
+                        };
+                        fs_1.default.mkdirSync(CONFIG_FILE_PATH, { recursive: true });
+                        fs_1.default.writeFileSync(CONFIG_FILE, ini_1.default.stringify(this.config));
+                    }
                 }
                 req.continue();
             }));
