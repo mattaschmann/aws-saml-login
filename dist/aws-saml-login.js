@@ -29,6 +29,7 @@ class AWSSamlLogin {
             .version(pjson.version)
             .description(pjson.description)
             .option('-d, --duration <secs>', 'session duration in seconds', '3600')
+            .option('-p, --profile <profile_name>', 'default profile to use')
             .arguments('<login_url>');
         commander_1.default.parse(args);
         if (!commander_1.default.args.length) {
@@ -36,6 +37,7 @@ class AWSSamlLogin {
             process.exit(0);
         }
         this.duration = parseInt(commander_1.default.duration, 10);
+        this.profile = commander_1.default.profile;
         this.loginUrl = commander_1.default.args[0];
     }
     static parsePost(postData) {
@@ -105,28 +107,30 @@ class AWSSamlLogin {
                     if (fs_1.default.existsSync(CREDENTIALS_FILE)) {
                         credentials = ini_1.default.parse(fs_1.default.readFileSync(CREDENTIALS_FILE, 'utf-8'));
                     }
-                    const profiles = [];
-                    for (const key in credentials) {
-                        if (credentials.hasOwnProperty(key)) {
-                            profiles.push(key);
+                    if (!this.profile) {
+                        const profiles = [];
+                        for (const key in credentials) {
+                            if (credentials.hasOwnProperty(key)) {
+                                profiles.push(key);
+                            }
                         }
+                        if (profiles.length > 0) {
+                            console.log('Existing profiles:');
+                            profiles.forEach((p) => console.log(safe_1.default.cyan(p)));
+                        }
+                        else {
+                            console.log('No profiles found');
+                        }
+                        this.profile = readline_sync_1.default.question('\nProfile you would like to update (or create): ');
                     }
-                    if (profiles.length > 0) {
-                        console.log('Existing profiles:');
-                        profiles.forEach((p) => console.log(safe_1.default.cyan(p)));
-                    }
-                    else {
-                        console.log('No profiles found');
-                    }
-                    const profile = readline_sync_1.default.question('\nProfile you would like to update (or create): ');
-                    credentials = Object.assign(credentials, { [profile]: {
+                    credentials = Object.assign(credentials, { [this.profile]: {
                             aws_access_key_id: resp.Credentials.AccessKeyId,
                             aws_secret_access_key: resp.Credentials.SecretAccessKey,
                             aws_session_token: resp.Credentials.SessionToken,
                         } });
                     fs_1.default.writeFileSync(CREDENTIALS_FILE, ini_1.default.stringify(credentials));
                     const expiration = new Date(resp.Credentials.Expiration);
-                    console.log(`\nProfile '${safe_1.default.cyan(profile)}' updated with credentials`);
+                    console.log(`\nProfile '${safe_1.default.cyan(this.profile)}' updated with credentials`);
                     console.log('Expires: ', safe_1.default.green(expiration.toString()));
                     console.log('\nRemember to update your region information in "~/.aws/config"');
                     console.log('see: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html');
@@ -134,7 +138,7 @@ class AWSSamlLogin {
                 req.continue();
             }));
             try {
-                yield page.goto(this.loginUrl);
+                yield page.goto(this.loginUrl, { timeout: 0 });
             }
             catch (err) {
                 console.error(err.message);

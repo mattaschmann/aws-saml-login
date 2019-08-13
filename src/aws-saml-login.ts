@@ -26,12 +26,14 @@ class AWSSamlLogin {
 
   private loginUrl: string = ''
   private duration: number = 3600
+  private profile: string
 
   constructor(args: string[]) {
     program
       .version(pjson.version)
       .description(pjson.description)
       .option('-d, --duration <secs>', 'session duration in seconds', '3600')
+      .option('-p, --profile <profile_name>', 'default profile to use')
       .arguments('<login_url>')
     program.parse(args)
 
@@ -41,6 +43,7 @@ class AWSSamlLogin {
     }
 
     this.duration = parseInt(program.duration, 10)
+    this.profile = program.profile
     this.loginUrl = program.args[0]
   }
 
@@ -112,22 +115,26 @@ class AWSSamlLogin {
           credentials = ini.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf-8'))
         }
 
-        const profiles = []
-        for (const key in credentials) {
-          if (credentials.hasOwnProperty(key)) {
-            profiles.push(key)
+        if (!this.profile) {
+
+          const profiles = []
+          for (const key in credentials) {
+            if (credentials.hasOwnProperty(key)) {
+              profiles.push(key)
+            }
           }
+
+          if (profiles.length > 0) {
+            console.log('Existing profiles:')
+            profiles.forEach((p) => console.log(colors.cyan(p)))
+          } else {
+            console.log('No profiles found')
+          }
+
+          this.profile = readline.question('\nProfile you would like to update (or create): ')
         }
 
-        if (profiles.length > 0) {
-          console.log('Existing profiles:')
-          profiles.forEach((p) => console.log(colors.cyan(p)))
-        } else {
-          console.log('No profiles found')
-        }
-
-        const profile = readline.question('\nProfile you would like to update (or create): ')
-        credentials = Object.assign(credentials, { [profile]: {
+        credentials = Object.assign(credentials, { [this.profile]: {
           aws_access_key_id: resp.Credentials!.AccessKeyId,
           aws_secret_access_key: resp.Credentials!.SecretAccessKey,
           aws_session_token: resp.Credentials!.SessionToken,
@@ -135,7 +142,7 @@ class AWSSamlLogin {
 
         fs.writeFileSync(CREDENTIALS_FILE, ini.stringify(credentials))
         const expiration = new Date(resp.Credentials!.Expiration)
-        console.log(`\nProfile '${colors.cyan(profile)}' updated with credentials`)
+        console.log(`\nProfile '${colors.cyan(this.profile)}' updated with credentials`)
         console.log('Expires: ', colors.green(expiration.toString()))
         console.log('\nRemember to update your region information in "~/.aws/config"')
         console.log('see: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html')
@@ -145,7 +152,7 @@ class AWSSamlLogin {
     })
 
     try {
-      await page.goto(this.loginUrl)
+      await page.goto(this.loginUrl, {timeout: 0})
     } catch (err) {
       console.error(err.message)
       process.exit(1)
