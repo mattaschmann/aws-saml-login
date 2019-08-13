@@ -157,7 +157,9 @@ class AWSSamlLogin {
                             aws_session_token: resp.Credentials.SessionToken,
                         },
                     });
-                    fs_1.default.mkdirSync(CREDENTIALS_FILE_PATH, { recursive: true });
+                    if (!fs_1.default.existsSync(CREDENTIALS_FILE_PATH)) {
+                        fs_1.default.mkdirSync(CREDENTIALS_FILE_PATH, { recursive: true });
+                    }
                     fs_1.default.writeFileSync(CREDENTIALS_FILE, ini_1.default.stringify(credentials));
                     const expiration = new Date(resp.Credentials.Expiration);
                     console.log(`\nProfile '${safe_1.default.cyan(this.profile)}' updated with credentials`);
@@ -171,8 +173,11 @@ class AWSSamlLogin {
                             principal: this.principal,
                             role: this.role,
                         };
-                        fs_1.default.mkdirSync(CONFIG_FILE_PATH, { recursive: true });
+                        if (!fs_1.default.existsSync(CONFIG_FILE_PATH)) {
+                            fs_1.default.mkdirSync(CONFIG_FILE_PATH, { recursive: true });
+                        }
                         fs_1.default.writeFileSync(CONFIG_FILE, ini_1.default.stringify(this.config));
+                        console.log(`\nProfile information stored in "${safe_1.default.yellow(CONFIG_FILE)}" for future reference`);
                     }
                 }
                 req.continue();

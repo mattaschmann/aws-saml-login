@@ -175,7 +175,9 @@ class AWSSamlLogin {
           },
         })
 
-        fs.mkdirSync(CREDENTIALS_FILE_PATH, {recursive: true})
+        if (!fs.existsSync(CREDENTIALS_FILE_PATH)) {
+          fs.mkdirSync(CREDENTIALS_FILE_PATH, {recursive: true})
+        }
         fs.writeFileSync(CREDENTIALS_FILE, ini.stringify(credentials))
         const expiration = new Date(resp.Credentials!.Expiration)
         console.log(`\nProfile '${colors.cyan(this.profile)}' updated with credentials`)
@@ -190,8 +192,12 @@ class AWSSamlLogin {
             principal: this.principal,
             role: this.role,
           }
-          fs.mkdirSync(CONFIG_FILE_PATH, {recursive: true})
+          if (!fs.existsSync(CONFIG_FILE_PATH)) {
+            fs.mkdirSync(CONFIG_FILE_PATH, {recursive: true})
+          }
           fs.writeFileSync(CONFIG_FILE, ini.stringify(this.config))
+
+          console.log(`\nProfile information stored in "${colors.yellow(CONFIG_FILE)}" for future reference`)
         }
       }
 
