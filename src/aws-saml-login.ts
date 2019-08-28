@@ -62,7 +62,7 @@ class AWSSamlLogin {
       this.profile = this.refresh
       if (fs.existsSync(CONFIG_FILE)) {
         this.config = ini.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'))
-        this.profileConfig = this.config[this.refresh]
+        this.profileConfig = this.config[this.refresh] || {}
         this.loginUrl = this.profileConfig.loginUrl
         this.role = this.profileConfig.role
         this.principal = this.profileConfig.principal
