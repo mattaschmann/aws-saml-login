@@ -27,19 +27,22 @@ class AWSSamlLogin {
     }, {})
   }
 
-  private loginUrl: string
-  private role: string = ''
-  private principal: string = ''
-  private duration: number = 3600
-  private profile: string
-  private refresh: string
+  private basicAuth: boolean = false
+  private basicCreds: any
   private config: any = {}
+  private duration: number = 3600
+  private loginUrl: string
+  private principal: string = ''
+  private profile: string
   private profileConfig: any = {}
+  private refresh: string
+  private role: string = ''
 
   constructor(args: string[]) {
     program
       .version(pjson.version)
       .description(pjson.description)
+      .option('-b, --basic_auth', 'use basic auth from the cli to login')
       .option('-d, --duration <secs>', 'session duration in seconds', '3600')
       .option('-p, --profile <profile_name>', 'default profile to use')
       .option('-r, --refresh <profile_name>', `attempts to refresh an existing profile using config options saved
@@ -53,10 +56,11 @@ class AWSSamlLogin {
       process.exit(0)
     }
 
+    this.basicAuth = program.basic_auth
     this.duration = parseInt(program.duration, 10)
+    this.loginUrl = program.args[0]
     this.profile = program.profile
     this.refresh = program.refresh
-    this.loginUrl = program.args[0]
 
     if (this.refresh) {
       this.profile = this.refresh
@@ -75,6 +79,11 @@ class AWSSamlLogin {
   }
 
   public async login() {
+    if (this.basicAuth) {
+      const username = readline.question('username: ')
+      const password = readline.question('password: ', {hideEchoBack: true})
+      this.basicCreds = {username, password}
+    }
 
     const browser = await puppeteer.launch({
       headless: false,
@@ -88,6 +97,8 @@ class AWSSamlLogin {
 
       const post = AWSSamlLogin.parsePost(req.postData())
       if (post.SAMLResponse) {
+        const cookies = await page.cookies()
+        console.log(cookies)
         await browser.close()
 
         if (!this.role || !this.principal) {
@@ -205,9 +216,13 @@ class AWSSamlLogin {
     })
 
     try {
+      if (this.basicAuth) {
+        page.authenticate(this.basicCreds)
+      }
       await page.goto(this.loginUrl, {timeout: 0})
     } catch (err) {
       console.error(err.message)
+      console.error(err)
       process.exit(1)
     }
   }

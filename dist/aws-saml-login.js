@@ -1,9 +1,10 @@
 "use strict";
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
+    function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
         function fulfilled(value) { try { step(generator.next(value)); } catch (e) { reject(e); } }
         function rejected(value) { try { step(generator["throw"](value)); } catch (e) { reject(e); } }
-        function step(result) { result.done ? resolve(result.value) : new P(function (resolve) { resolve(result.value); }).then(fulfilled, rejected); }
+        function step(result) { result.done ? resolve(result.value) : adopt(result.value).then(fulfilled, rejected); }
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
@@ -26,14 +27,16 @@ const CONFIG_FILE_PATH = os_1.default.homedir() + '/.config/aws-saml-login';
 const CONFIG_FILE = CONFIG_FILE_PATH + '/config';
 class AWSSamlLogin {
     constructor(args) {
-        this.role = '';
-        this.principal = '';
-        this.duration = 3600;
+        this.basicAuth = false;
         this.config = {};
+        this.duration = 3600;
+        this.principal = '';
         this.profileConfig = {};
+        this.role = '';
         commander_1.default
             .version(pjson.version)
             .description(pjson.description)
+            .option('-b, --basic_auth', 'use basic auth from the cli to login')
             .option('-d, --duration <secs>', 'session duration in seconds', '3600')
             .option('-p, --profile <profile_name>', 'default profile to use')
             .option('-r, --refresh <profile_name>', `attempts to refresh an existing profile using config options saved
@@ -45,10 +48,11 @@ class AWSSamlLogin {
             commander_1.default.outputHelp();
             process.exit(0);
         }
+        this.basicAuth = commander_1.default.basic_auth;
         this.duration = parseInt(commander_1.default.duration, 10);
+        this.loginUrl = commander_1.default.args[0];
         this.profile = commander_1.default.profile;
         this.refresh = commander_1.default.refresh;
-        this.loginUrl = commander_1.default.args[0];
         if (this.refresh) {
             this.profile = this.refresh;
             if (fs_1.default.existsSync(CONFIG_FILE)) {
@@ -75,6 +79,11 @@ class AWSSamlLogin {
     }
     login() {
         return __awaiter(this, void 0, void 0, function* () {
+            if (this.basicAuth) {
+                const username = readline_sync_1.default.question('username: ');
+                const password = readline_sync_1.default.question('password: ', { hideEchoBack: true });
+                this.basicCreds = { username, password };
+            }
             const browser = yield puppeteer_1.default.launch({
                 headless: false,
             });
@@ -84,6 +93,8 @@ class AWSSamlLogin {
             page.on('request', (req) => __awaiter(this, void 0, void 0, function* () {
                 const post = AWSSamlLogin.parsePost(req.postData());
                 if (post.SAMLResponse) {
+                    const cookies = yield page.cookies();
+                    console.log(cookies);
                     yield browser.close();
                     if (!this.role || !this.principal) {
                         const decoded = Buffer
@@ -183,10 +194,14 @@ class AWSSamlLogin {
                 req.continue();
             }));
             try {
+                if (this.basicAuth) {
+                    page.authenticate(this.basicCreds);
+                }
                 yield page.goto(this.loginUrl, { timeout: 0 });
             }
             catch (err) {
                 console.error(err.message);
+                console.error(err);
                 process.exit(1);
             }
         });
