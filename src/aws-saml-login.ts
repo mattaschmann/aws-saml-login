@@ -97,8 +97,6 @@ class AWSSamlLogin {
 
       const post = AWSSamlLogin.parsePost(req.postData())
       if (post.SAMLResponse) {
-        const cookies = await page.cookies()
-        console.log(cookies)
         await browser.close()
 
         if (!this.role || !this.principal) {
