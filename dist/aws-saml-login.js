@@ -93,8 +93,6 @@ class AWSSamlLogin {
             page.on('request', (req) => __awaiter(this, void 0, void 0, function* () {
                 const post = AWSSamlLogin.parsePost(req.postData());
                 if (post.SAMLResponse) {
-                    const cookies = yield page.cookies();
-                    console.log(cookies);
                     yield browser.close();
                     if (!this.role || !this.principal) {
                         const decoded = Buffer
