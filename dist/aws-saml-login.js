@@ -37,7 +37,8 @@ class AWSSamlLogin {
         program
             .version(pjson.version)
             .description(pjson.description)
-            .option('-b, --basic_auth', 'use basic auth from the cli to login')
+            .option('-b, --basic_auth', `use basic auth from the cli to login, this will run the browser in
+                              headless mode`)
             .option('-d, --duration <secs>', 'session duration in seconds', '3600')
             .option('-p, --profile <profile_name>', 'default profile to use')
             .option('-r, --refresh <profile_name>', `attempts to refresh an existing profile using config options saved
@@ -87,7 +88,7 @@ class AWSSamlLogin {
                 this.basicCreds = { username, password };
             }
             const browser = yield puppeteer_1.default.launch({
-                headless: false,
+                headless: (this.basicAuth ? true : false),
             });
             const pages = yield browser.pages();
             const page = pages[0];
