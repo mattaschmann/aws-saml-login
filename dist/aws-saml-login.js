@@ -16,15 +16,16 @@ const safe_1 = __importDefault(require("colors/safe"));
 const fs_1 = __importDefault(require("fs"));
 const ini_1 = __importDefault(require("ini"));
 const os_1 = __importDefault(require("os"));
-const commander_1 = __importDefault(require("commander"));
 const puppeteer_1 = __importDefault(require("puppeteer"));
 const readline_sync_1 = __importDefault(require("readline-sync"));
+const commander_1 = require("commander");
 const aws_sdk_1 = require("aws-sdk");
 const pjson = require('../package.json');
 const CREDENTIALS_FILE_PATH = os_1.default.homedir() + '/.aws';
 const CREDENTIALS_FILE = CREDENTIALS_FILE_PATH + '/credentials';
 const CONFIG_FILE_PATH = os_1.default.homedir() + '/.config/aws-saml-login';
 const CONFIG_FILE = CONFIG_FILE_PATH + '/config';
+const program = new commander_1.Command();
 class AWSSamlLogin {
     constructor(args) {
         this.basicAuth = false;
@@ -33,7 +34,7 @@ class AWSSamlLogin {
         this.principal = '';
         this.profileConfig = {};
         this.role = '';
-        commander_1.default
+        program
             .version(pjson.version)
             .description(pjson.description)
             .option('-b, --basic_auth', 'use basic auth from the cli to login')
@@ -43,16 +44,16 @@ class AWSSamlLogin {
                               in "~/.config/aws-saml-login/config".  Will create the entry if it
                               does not exist.\n`)
             .arguments('<login_url>');
-        commander_1.default.parse(args);
-        if (!commander_1.default.args.length && !commander_1.default.refresh) {
-            commander_1.default.outputHelp();
+        program.parse(args);
+        if (!program.args.length && !program.opts().refresh) {
+            program.outputHelp();
             process.exit(0);
         }
-        this.basicAuth = commander_1.default.basic_auth;
-        this.duration = parseInt(commander_1.default.duration, 10);
-        this.loginUrl = commander_1.default.args[0];
-        this.profile = commander_1.default.profile;
-        this.refresh = commander_1.default.refresh;
+        this.basicAuth = program.opts().basic_auth;
+        this.duration = parseInt(program.opts().duration, 10);
+        this.loginUrl = program.args[0];
+        this.profile = program.opts().profile;
+        this.refresh = program.opts().refresh;
         if (this.refresh) {
             this.profile = this.refresh;
             if (fs_1.default.existsSync(CONFIG_FILE)) {
@@ -81,6 +82,7 @@ class AWSSamlLogin {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.basicAuth) {
                 const username = readline_sync_1.default.question('username: ');
+                console.log('NOTE: backspace is disabled!');
                 const password = readline_sync_1.default.question('password: ', { hideEchoBack: true });
                 this.basicCreds = { username, password };
             }
@@ -144,12 +146,7 @@ class AWSSamlLogin {
                         credentials = ini_1.default.parse(fs_1.default.readFileSync(CREDENTIALS_FILE, 'utf-8'));
                     }
                     if (!this.profile) {
-                        const profiles = [];
-                        for (const key in credentials) {
-                            if (credentials.hasOwnProperty(key)) {
-                                profiles.push(key);
-                            }
-                        }
+                        const profiles = Object.keys(credentials);
                         if (profiles.length > 0) {
                             console.log('Existing profiles:');
                             profiles.forEach((p) => console.log(safe_1.default.cyan(p)));
@@ -198,6 +195,13 @@ class AWSSamlLogin {
                 yield page.goto(this.loginUrl, { timeout: 0 });
             }
             catch (err) {
+                if (
+                // Always happens if basic auth is not set
+                err.message.startsWith('net::ERR_INVALID_AUTH_CREDENTIALS') ||
+                    // Will happen with successful basic authentication
+                    err.message.startsWith('Navigation failed because browser has disconnected!')) {
+                    return;
+                }
                 console.error(err.message);
                 console.error(err);
                 process.exit(1);
