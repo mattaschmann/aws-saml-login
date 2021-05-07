@@ -2,9 +2,9 @@ import colors from 'colors/safe'
 import fs from 'fs'
 import ini from 'ini'
 import os from 'os'
-import program from 'commander'
 import puppeteer from 'puppeteer'
 import readline from 'readline-sync'
+import {Command} from 'commander'
 import {STS} from 'aws-sdk'
 
 const pjson = require('../package.json')
@@ -13,6 +13,8 @@ const CREDENTIALS_FILE_PATH = os.homedir() + '/.aws'
 const CREDENTIALS_FILE = CREDENTIALS_FILE_PATH + '/credentials'
 const CONFIG_FILE_PATH = os.homedir() + '/.config/aws-saml-login'
 const CONFIG_FILE = CONFIG_FILE_PATH + '/config'
+
+const program = new Command()
 
 class AWSSamlLogin {
 
@@ -42,7 +44,8 @@ class AWSSamlLogin {
     program
       .version(pjson.version)
       .description(pjson.description)
-      .option('-b, --basic_auth', 'use basic auth from the cli to login')
+      .option('-b, --basic_auth', `use basic auth from the cli to login, this will run the browser in
+                              headless mode`)
       .option('-d, --duration <secs>', 'session duration in seconds', '3600')
       .option('-p, --profile <profile_name>', 'default profile to use')
       .option('-r, --refresh <profile_name>', `attempts to refresh an existing profile using config options saved
@@ -51,16 +54,16 @@ class AWSSamlLogin {
       .arguments('<login_url>')
     program.parse(args)
 
-    if (!program.args.length && !program.refresh) {
+    if (!program.args.length && !program.opts().refresh) {
       program.outputHelp()
       process.exit(0)
     }
 
-    this.basicAuth = program.basic_auth
-    this.duration = parseInt(program.duration, 10)
+    this.basicAuth = program.opts().basic_auth
+    this.duration = parseInt(program.opts().duration, 10)
     this.loginUrl = program.args[0]
-    this.profile = program.profile
-    this.refresh = program.refresh
+    this.profile = program.opts().profile
+    this.refresh = program.opts().refresh
 
     if (this.refresh) {
       this.profile = this.refresh
@@ -81,12 +84,13 @@ class AWSSamlLogin {
   public async login() {
     if (this.basicAuth) {
       const username = readline.question('username: ')
+      console.log('NOTE: backspace is disabled!')
       const password = readline.question('password: ', {hideEchoBack: true})
       this.basicCreds = {username, password}
     }
 
     const browser = await puppeteer.launch({
-      headless: false,
+      headless: (this.basicAuth ? true : false),
     })
 
     const pages = await browser.pages()
@@ -154,17 +158,12 @@ class AWSSamlLogin {
 
         let credentials = {}
         if (fs.existsSync(CREDENTIALS_FILE)) {
-          credentials = ini.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf-8'))
+          credentials = ini.parse(fs.readFileSync(CREDENTIALS_FILE, 'utf-8')) as object
         }
 
         if (!this.profile) {
 
-          const profiles = []
-          for (const key in credentials) {
-            if (credentials.hasOwnProperty(key)) {
-              profiles.push(key)
-            }
-          }
+          const profiles = Object.keys(credentials)
 
           if (profiles.length > 0) {
             console.log('Existing profiles:')
@@ -219,6 +218,15 @@ class AWSSamlLogin {
       }
       await page.goto(this.loginUrl, {timeout: 0})
     } catch (err) {
+      if (
+        // Always happens if basic auth is not set
+        err.message.startsWith('net::ERR_INVALID_AUTH_CREDENTIALS') ||
+        // Will happen with successful basic authentication
+        err.message.startsWith('Navigation failed because browser has disconnected!')
+      ) {
+        return
+      }
+
       console.error(err.message)
       console.error(err)
       process.exit(1)
