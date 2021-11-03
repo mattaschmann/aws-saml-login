@@ -39,6 +39,7 @@ class AWSSamlLogin {
   private profileConfig: any = {}
   private refresh: string
   private role: string = ''
+  private roleArn: string = ''
 
   constructor(args: string[]) {
     program
@@ -51,6 +52,7 @@ class AWSSamlLogin {
       .option('-r, --refresh <profile_name>', `attempts to refresh an existing profile using config options saved
                               in "~/.config/aws-saml-login/config".  Will create the entry if it
                               does not exist.\n`)
+      .option('-a, --role_arn <role_arn>', `role ARN to login as`)
       .arguments('<login_url>')
     program.parse(args)
 
@@ -64,6 +66,7 @@ class AWSSamlLogin {
     this.loginUrl = program.args[0]
     this.profile = program.opts().profile
     this.refresh = program.opts().refresh
+    this.roleArn = program.opts().role_arn
 
     if (this.refresh) {
       this.profile = this.refresh
@@ -115,15 +118,26 @@ class AWSSamlLogin {
               const [p, r] = i.split(',')
               return {principal: p, role: r}
             })
+          
+          let roleMatch
+          if (this.roleArn && this.roleArn.length) {
+            roleMatch = roles.find(r => r.role === this.roleArn)
+            if (!roleMatch) console.log(`"${this.roleArn}" not an available role.`)
+          }
 
-          console.log('\nAvailable roles:')
-          roles.forEach((r, i) => console.log(`${colors.cyan(i.toString())}: ${r.role}`))
-          console.log(' ')
+          if (roleMatch) {
+            this.role = roleMatch.role
+            this.principal = roleMatch.principal
+          } else {
+            console.log('\nAvailable roles:')
+            roles.forEach((r, i) => console.log(`${colors.cyan(i.toString())}: ${r.role}`))
+            console.log(' ')
 
-          const selection = readline.question('Which role do you want to use? ')
-          const {role, principal} = roles[parseInt(selection, 10)]
-          this.role = role
-          this.principal = principal
+            const selection = readline.question('Which role do you want to use? ')
+            const {role, principal} = roles[parseInt(selection, 10)]
+            this.role = role
+            this.principal = principal
+          }
 
           if (!this.role || !this.principal) {
             console.log('You did not select one of the available roles!')

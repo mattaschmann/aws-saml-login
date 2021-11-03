@@ -34,6 +34,7 @@ class AWSSamlLogin {
         this.principal = '';
         this.profileConfig = {};
         this.role = '';
+        this.roleArn = '';
         program
             .version(pjson.version)
             .description(pjson.description)
@@ -44,6 +45,7 @@ class AWSSamlLogin {
             .option('-r, --refresh <profile_name>', `attempts to refresh an existing profile using config options saved
                               in "~/.config/aws-saml-login/config".  Will create the entry if it
                               does not exist.\n`)
+            .option('-a, --role_arn <role_arn>', `role arn to use to login as`)
             .arguments('<login_url>');
         program.parse(args);
         if (!program.args.length && !program.opts().refresh) {
@@ -55,6 +57,7 @@ class AWSSamlLogin {
         this.loginUrl = program.args[0];
         this.profile = program.opts().profile;
         this.refresh = program.opts().refresh;
+        this.roleArn = program.opts().role_arn;
         if (this.refresh) {
             this.profile = this.refresh;
             if (fs_1.default.existsSync(CONFIG_FILE)) {
@@ -107,13 +110,25 @@ class AWSSamlLogin {
                             const [p, r] = i.split(',');
                             return { principal: p, role: r };
                         });
-                        console.log('\nAvailable roles:');
-                        roles.forEach((r, i) => console.log(`${safe_1.default.cyan(i.toString())}: ${r.role}`));
-                        console.log(' ');
-                        const selection = readline_sync_1.default.question('Which role do you want to use? ');
-                        const { role, principal } = roles[parseInt(selection, 10)];
-                        this.role = role;
-                        this.principal = principal;
+                        let roleMatch;
+                        if (this.roleArn && this.roleArn.length) {
+                            roleMatch = roles.find(r => r.role === this.roleArn);
+                            if (!roleMatch)
+                                console.log(`${this.roleArn} not an available role.`);
+                        }
+                        if (roleMatch) {
+                            this.role = roleMatch.role;
+                            this.principal = roleMatch.principal;
+                        }
+                        else {
+                            console.log('\nAvailable roles:');
+                            roles.forEach((r, i) => console.log(`${safe_1.default.cyan(i.toString())}: ${r.role}`));
+                            console.log(' ');
+                            const selection = readline_sync_1.default.question('Which role do you want to use? ');
+                            const { role, principal } = roles[parseInt(selection, 10)];
+                            this.role = role;
+                            this.principal = principal;
+                        }
                         if (!this.role || !this.principal) {
                             console.log('You did not select one of the available roles!');
                             process.exit(1);
