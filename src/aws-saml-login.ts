@@ -118,11 +118,13 @@ class AWSSamlLogin {
               const [p, r] = i.split(',')
               return {principal: p, role: r}
             })
-          
+
           let roleMatch
           if (this.roleArn && this.roleArn.length) {
-            roleMatch = roles.find(r => r.role === this.roleArn)
-            if (!roleMatch) console.log(`"${this.roleArn}" not an available role.`)
+            roleMatch = roles.find((r) => r.role === this.roleArn)
+            if (!roleMatch) {
+              console.log(`"${this.roleArn}" not an available role.`)
+            }
           }
 
           if (roleMatch) {
