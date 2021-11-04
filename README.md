@@ -13,21 +13,21 @@ $ npm install -g aws-saml-login
 ## Usage
 ```shell
 
-Usage: index [options] <login_url>
-
 Usage: aws-saml-login [options] <login_url>
 
 A simple cli utility to get temporary AWS credentials via a SAML endpoint
 
 Options:
   -V, --version                 output the version number
-  -b, --basic_auth              use basic auth from the cli to login
+  -b, --basic_auth              use basic auth from the cli to login, this will run the browser in
+                                headless mode
   -d, --duration <secs>         session duration in seconds (default: "3600")
   -p, --profile <profile_name>  default profile to use
   -r, --refresh <profile_name>  attempts to refresh an existing profile using config options saved
                                 in "~/.config/aws-saml-login/config".  Will create the entry if it
                                 does not exist.
 
-  -h, --help                    output usage information
+  -a, --role_arn <role_arn>     role ARN to login as
+  -h, --help                    display help for command
 
 ```
