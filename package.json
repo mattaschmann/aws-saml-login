@@ -23,7 +23,7 @@
     "node": ">=10.12.0"
   },
   "dependencies": {
-    "aws-sdk": "2.902.0",
+    "aws-sdk": "2.1354.0",
     "colors": "1.4.0",
     "commander": "7.2.0",
     "ini": "2.0.0",
