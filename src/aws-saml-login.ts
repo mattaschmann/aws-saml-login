@@ -96,6 +96,20 @@ class AWSSamlLogin {
         console.log(`\nChrome path "${colors.green(this.chromePath)}" stored in "${colors.yellow(CONFIG_FILE)}" for future reference`)
       }
 
+      if (this.refresh) {
+        this.profile = this.refresh
+        this.profileConfig = this.config[this.refresh] || {}
+        this.loginUrl = this.profileConfig.loginUrl
+        this.role = this.profileConfig.role
+        this.principal = this.profileConfig.principal
+        this.awsRegion = this.profileConfig.awsRegion || this.awsRegion || readline.question('\nAWS Region: ')
+
+        if (!this.loginUrl) {
+          this.loginUrl = readline.question('\nLogin URL: ')
+        }
+
+      }
+
       if (!this.awsRegion) {
         this.awsRegion = this.config.awsRegion || readline.question('\nAWS Region: ')
       }
@@ -106,18 +120,6 @@ class AWSSamlLogin {
       }
 
 
-      if (this.refresh) {
-        this.profile = this.refresh
-        this.profileConfig = this.config[this.refresh] || {}
-        this.loginUrl = this.profileConfig.loginUrl
-        this.role = this.profileConfig.role
-        this.principal = this.profileConfig.principal
-
-        if (!this.loginUrl) {
-          this.loginUrl = readline.question('\nLogin URL: ')
-        }
-
-      }
     } else {
       console.log("Couldn't load the config file")
       process.exit(1)
@@ -136,8 +138,7 @@ class AWSSamlLogin {
     const browser = await puppeteer.launch({
       product: "chrome",
       headless: (this.basicAuth ? true : false),
-      executablePath: this.chromePath,
-      // @Matt TODO: userDataDir
+      executablePath: this.chromePath
     })
 
     const pages = await browser.pages()
@@ -263,6 +264,7 @@ class AWSSamlLogin {
             loginUrl: this.loginUrl,
             principal: this.principal,
             role: this.role,
+            awsRegion: this.awsRegion
           }
 
           saveConfig(this.config)

@@ -1,4 +1,27 @@
 "use strict";
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    var desc = Object.getOwnPropertyDescriptor(m, k);
+    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
+      desc = { enumerable: true, get: function() { return m[k]; } };
+    }
+    Object.defineProperty(o, k2, desc);
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
+    Object.defineProperty(o, "default", { enumerable: true, value: v });
+}) : function(o, v) {
+    o["default"] = v;
+});
+var __importStar = (this && this.__importStar) || function (mod) {
+    if (mod && mod.__esModule) return mod;
+    var result = {};
+    if (mod != null) for (var k in mod) if (k !== "default" && Object.prototype.hasOwnProperty.call(mod, k)) __createBinding(result, mod, k);
+    __setModuleDefault(result, mod);
+    return result;
+};
 var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, generator) {
     function adopt(value) { return value instanceof P ? value : new P(function (resolve) { resolve(value); }); }
     return new (P || (P = Promise))(function (resolve, reject) {
@@ -12,14 +35,14 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+const sts = __importStar(require("@aws-sdk/client-sts"));
 const safe_1 = __importDefault(require("colors/safe"));
+const commander_1 = require("commander");
 const fs_1 = __importDefault(require("fs"));
 const ini_1 = __importDefault(require("ini"));
 const os_1 = __importDefault(require("os"));
 const puppeteer_core_1 = __importDefault(require("puppeteer-core"));
 const readline_sync_1 = __importDefault(require("readline-sync"));
-const commander_1 = require("commander");
-const aws_sdk_1 = require("aws-sdk");
 const pjson = require('../package.json');
 const CREDENTIALS_FILE_PATH = os_1.default.homedir() + '/.aws';
 const CREDENTIALS_FILE = CREDENTIALS_FILE_PATH + '/credentials';
@@ -40,29 +63,35 @@ class AWSSamlLogin {
     constructor(args) {
         this.basicAuth = false;
         this.config = {};
-        this.duration = 3600;
+        this.duration = 28800;
         this.principal = '';
         this.profileConfig = {};
         this.role = '';
         this.roleArn = '';
+        this.chromePath = '';
+        this.awsRegion = '';
         program.exitOverride((err) => {
-            if (err.code === 'commander.missingArgument') {
+            if (err.code === 'commander.missingArgument' && !program.opts().refresh) {
                 program.outputHelp();
             }
-            process.exit(err.exitCode);
+            if (!program.opts().refresh) {
+                process.exit(err.exitCode);
+            }
         });
         program
             .version(pjson.version)
             .description(pjson.description)
             .option('-b, --basic_auth', `use basic auth from the cli to login, this will run the browser in
                               headless mode`)
-            .option('-d, --duration <secs>', 'session duration in seconds', '3600')
+            .option('-d, --duration <secs>', 'session duration in seconds', '28800')
             .option('-p, --profile <profile_name>', 'default profile to use')
             .option('-r, --refresh <profile_name>', `attempts to refresh an existing profile using config options saved
                               in "~/.config/aws-saml-login/config".  Will create the entry if it
                               does not exist.\n`)
             .option('-a, --role_arn <role_arn>', `role ARN to login as`)
-            .arguments('<login_url>');
+            .option('-c, --chrome_path <path>', `System path to chrome executable`)
+            .option('-n, --aws_region <region>', `AWS Region`)
+            .arguments('[login_url]');
         program.parse(args);
         if (!program.args.length && !program.opts().refresh) {
             program.outputHelp();
@@ -74,18 +103,41 @@ class AWSSamlLogin {
         this.profile = program.opts().profile;
         this.refresh = program.opts().refresh;
         this.roleArn = program.opts().role_arn;
-        if (this.refresh) {
-            this.profile = this.refresh;
-            if (fs_1.default.existsSync(CONFIG_FILE)) {
-                this.config = ini_1.default.parse(fs_1.default.readFileSync(CONFIG_FILE, 'utf-8'));
+        this.chromePath = program.opts().chrome_path;
+        this.awsRegion = program.opts().aws_region;
+        if (fs_1.default.existsSync(CONFIG_FILE)) {
+            this.config = ini_1.default.parse(fs_1.default.readFileSync(CONFIG_FILE, 'utf-8'));
+            if (!this.chromePath) {
+                this.chromePath = this.config.chromePath || readline_sync_1.default.question('\nPath to chrome executable: ');
+            }
+            if (this.config.chromePath !== this.chromePath) {
+                this.config.chromePath = this.chromePath;
+                saveConfig(this.config);
+                console.log(`\nChrome path "${safe_1.default.green(this.chromePath)}" stored in "${safe_1.default.yellow(CONFIG_FILE)}" for future reference`);
+            }
+            if (this.refresh) {
+                this.profile = this.refresh;
                 this.profileConfig = this.config[this.refresh] || {};
                 this.loginUrl = this.profileConfig.loginUrl;
                 this.role = this.profileConfig.role;
                 this.principal = this.profileConfig.principal;
+                this.awsRegion = this.profileConfig.awsRegion || this.awsRegion || readline_sync_1.default.question('\nAWS Region: ');
+                if (!this.loginUrl) {
+                    this.loginUrl = readline_sync_1.default.question('\nLogin URL: ');
+                }
             }
-            if (!this.loginUrl) {
-                this.loginUrl = readline_sync_1.default.question('\nLogin URL: ');
+            if (!this.awsRegion) {
+                this.awsRegion = this.config.awsRegion || readline_sync_1.default.question('\nAWS Region: ');
             }
+            if (this.config.awsRegion !== this.awsRegion) {
+                this.config.awsRegion = this.awsRegion;
+                saveConfig(this.config);
+                console.log(`\nAWS Region "${safe_1.default.green(this.awsRegion)}" stored in "${safe_1.default.yellow(CONFIG_FILE)}" for future reference`);
+            }
+        }
+        else {
+            console.log("Couldn't load the config file");
+            process.exit(1);
         }
     }
     login() {
@@ -99,7 +151,7 @@ class AWSSamlLogin {
             const browser = yield puppeteer_core_1.default.launch({
                 product: "chrome",
                 headless: (this.basicAuth ? true : false),
-                executablePath: '/usr/bin/google-chrome-stable'
+                executablePath: this.chromePath
             });
             const pages = yield browser.pages();
             const page = pages[0];
@@ -143,20 +195,23 @@ class AWSSamlLogin {
                             process.exit(1);
                         }
                     }
-                    const sts = new aws_sdk_1.STS();
+                    const client = new sts.STSClient({
+                        region: this.awsRegion
+                    });
+                    const command = new sts.AssumeRoleWithSAMLCommand({
+                        DurationSeconds: this.duration,
+                        PrincipalArn: this.principal,
+                        RoleArn: this.role,
+                        SAMLAssertion: post.SAMLResponse,
+                    });
                     let resp = {};
                     try {
-                        resp = yield sts.assumeRoleWithSAML({
-                            DurationSeconds: this.duration,
-                            PrincipalArn: this.principal,
-                            RoleArn: this.role,
-                            SAMLAssertion: post.SAMLResponse,
-                        }).promise();
+                        resp = yield client.send(command);
                     }
                     catch (err) {
                         console.log('\n' + safe_1.default.red(err.code));
                         console.log(err.message);
-                        console.log('see: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/STS.html#assumeRoleWithSAML-property');
+                        console.log('see: https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/sts/command/AssumeRoleWithSAMLCommand/');
                         process.exit(1);
                     }
                     if (!resp.Credentials) {
@@ -197,17 +252,15 @@ class AWSSamlLogin {
                     console.log('Expires: ', safe_1.default.green(expiration.toString()));
                     console.log('\nRemember to update your region information in "~/.aws/config"');
                     console.log('see: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html');
-                    // Write to config if we are refreshing
+                    // Write profile to config
                     if (this.refresh) {
                         this.config[this.refresh] = {
                             loginUrl: this.loginUrl,
                             principal: this.principal,
                             role: this.role,
+                            awsRegion: this.awsRegion
                         };
-                        if (!fs_1.default.existsSync(CONFIG_FILE_PATH)) {
-                            fs_1.default.mkdirSync(CONFIG_FILE_PATH, { recursive: true });
-                        }
-                        fs_1.default.writeFileSync(CONFIG_FILE, ini_1.default.stringify(this.config));
+                        saveConfig(this.config);
                         console.log(`\nProfile information stored in "${safe_1.default.yellow(CONFIG_FILE)}" for future reference`);
                     }
                 }
@@ -233,6 +286,12 @@ class AWSSamlLogin {
             }
         });
     }
+}
+function saveConfig(config) {
+    if (!fs_1.default.existsSync(CONFIG_FILE_PATH)) {
+        fs_1.default.mkdirSync(CONFIG_FILE_PATH, { recursive: true });
+    }
+    fs_1.default.writeFileSync(CONFIG_FILE, ini_1.default.stringify(config));
 }
 exports.default = AWSSamlLogin;
 //# sourceMappingURL=aws-saml-login.js.map
