@@ -1,11 +1,11 @@
+import * as sts from '@aws-sdk/client-sts'
 import colors from 'colors/safe'
+import {Command} from 'commander'
 import fs from 'fs'
 import ini from 'ini'
 import os from 'os'
 import puppeteer from 'puppeteer-core'
 import readline from 'readline-sync'
-import {Command} from 'commander'
-import {STS} from 'aws-sdk'
 
 const pjson = require('../package.json')
 
@@ -32,7 +32,7 @@ class AWSSamlLogin {
   private basicAuth: boolean = false
   private basicCreds: any
   private config: any = {}
-  private duration: number = 3600
+  private duration: number = 28800
   private loginUrl: string
   private principal: string = ''
   private profile: string
@@ -43,10 +43,15 @@ class AWSSamlLogin {
 
   constructor(args: string[]) {
     program.exitOverride((err) => {
-      if (err.code === 'commander.missingArgument') {
+      // @Matt DEBUG
+      debugger
+      if (err.code === 'commander.missingArgument' && !program.opts().refresh) {
         program.outputHelp();
       }
-      process.exit(err.exitCode);
+
+      if (!program.opts().refresh) {
+        process.exit(err.exitCode);
+      }
     })
 
     program
@@ -54,13 +59,13 @@ class AWSSamlLogin {
       .description(pjson.description)
       .option('-b, --basic_auth', `use basic auth from the cli to login, this will run the browser in
                               headless mode`)
-      .option('-d, --duration <secs>', 'session duration in seconds', '3600')
+      .option('-d, --duration <secs>', 'session duration in seconds', '28800')
       .option('-p, --profile <profile_name>', 'default profile to use')
       .option('-r, --refresh <profile_name>', `attempts to refresh an existing profile using config options saved
                               in "~/.config/aws-saml-login/config".  Will create the entry if it
                               does not exist.\n`)
       .option('-a, --role_arn <role_arn>', `role ARN to login as`)
-      .arguments('<login_url>')
+      .arguments('[login_url]')
     program.parse(args)
 
     if (!program.args.length && !program.opts().refresh) {
@@ -102,7 +107,9 @@ class AWSSamlLogin {
     const browser = await puppeteer.launch({
       product: "chrome",
       headless: (this.basicAuth ? true : false),
-      executablePath: '/usr/bin/google-chrome-stable'
+      // @Matt TODO: come from config/arg
+      executablePath: '/usr/bin/google-chrome-stable',
+      // @Matt TODO: userDataDir
     })
 
     const pages = await browser.pages()
@@ -157,19 +164,20 @@ class AWSSamlLogin {
           }
         }
 
-        const sts = new STS()
-        let resp: STS.Types.AssumeRoleWithSAMLResponse = {}
+        const client = new sts.STSClient()
+        const command = new sts.AssumeRoleWithSAMLCommand({
+          DurationSeconds: this.duration,
+          PrincipalArn: this.principal,
+          RoleArn: this.role,
+          SAMLAssertion: post.SAMLResponse,
+        })
+        let resp: sts.AssumeRoleWithSAMLResponse = {}
         try {
-          resp = await sts.assumeRoleWithSAML({
-            DurationSeconds: this.duration,
-            PrincipalArn: this.principal,
-            RoleArn: this.role,
-            SAMLAssertion: post.SAMLResponse,
-          }).promise()
+          resp = await client.send(command)
         } catch (err: any) {
           console.log('\n' + colors.red(err.code))
           console.log(err.message)
-          console.log('see: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/STS.html#assumeRoleWithSAML-property')
+          console.log('see: https://docs.aws.amazon.com/AWSJavaScriptSDK/v3/latest/client/sts/command/AssumeRoleWithSAMLCommand/')
           process.exit(1)
         }
 
@@ -213,7 +221,7 @@ class AWSSamlLogin {
           fs.mkdirSync(CREDENTIALS_FILE_PATH, {recursive: true})
         }
         fs.writeFileSync(CREDENTIALS_FILE, ini.stringify(credentials))
-        const expiration = new Date(resp.Credentials!.Expiration)
+        const expiration = new Date(resp.Credentials!.Expiration!)
         console.log(`\nProfile '${colors.cyan(this.profile)}' updated with credentials`)
         console.log('Expires: ', colors.green(expiration.toString()))
         console.log('\nRemember to update your region information in "~/.aws/config"')
