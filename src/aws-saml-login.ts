@@ -44,16 +44,6 @@ class AWSSamlLogin {
   private awsRegion: string = ''
 
   constructor(args: string[]) {
-    program.exitOverride((err) => {
-      if (err.code === 'commander.missingArgument' && !program.opts().refresh) {
-        program.outputHelp();
-      }
-
-      if (!program.opts().refresh) {
-        process.exit(err.exitCode);
-      }
-    })
-
     program
       .version(pjson.version)
       .description(pjson.description)
