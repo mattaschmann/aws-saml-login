@@ -16,7 +16,7 @@ const safe_1 = __importDefault(require("colors/safe"));
 const fs_1 = __importDefault(require("fs"));
 const ini_1 = __importDefault(require("ini"));
 const os_1 = __importDefault(require("os"));
-const puppeteer_1 = __importDefault(require("puppeteer"));
+const puppeteer_core_1 = __importDefault(require("puppeteer-core"));
 const readline_sync_1 = __importDefault(require("readline-sync"));
 const commander_1 = require("commander");
 const aws_sdk_1 = require("aws-sdk");
@@ -27,6 +27,16 @@ const CONFIG_FILE_PATH = os_1.default.homedir() + '/.config/aws-saml-login';
 const CONFIG_FILE = CONFIG_FILE_PATH + '/config';
 const program = new commander_1.Command();
 class AWSSamlLogin {
+    static parsePost(postData) {
+        if (!postData) {
+            return {};
+        }
+        const args = postData.split('&');
+        return args.reduce((acc, arg) => {
+            const [key, val] = decodeURIComponent(arg).split('=');
+            return Object.assign(acc, { [key]: val });
+        }, {});
+    }
     constructor(args) {
         this.basicAuth = false;
         this.config = {};
@@ -35,6 +45,12 @@ class AWSSamlLogin {
         this.profileConfig = {};
         this.role = '';
         this.roleArn = '';
+        program.exitOverride((err) => {
+            if (err.code === 'commander.missingArgument') {
+                program.outputHelp();
+            }
+            process.exit(err.exitCode);
+        });
         program
             .version(pjson.version)
             .description(pjson.description)
@@ -45,7 +61,7 @@ class AWSSamlLogin {
             .option('-r, --refresh <profile_name>', `attempts to refresh an existing profile using config options saved
                               in "~/.config/aws-saml-login/config".  Will create the entry if it
                               does not exist.\n`)
-            .option('-a, --role_arn <role_arn>', `role arn to use to login as`)
+            .option('-a, --role_arn <role_arn>', `role ARN to login as`)
             .arguments('<login_url>');
         program.parse(args);
         if (!program.args.length && !program.opts().refresh) {
@@ -72,16 +88,6 @@ class AWSSamlLogin {
             }
         }
     }
-    static parsePost(postData) {
-        if (!postData) {
-            return {};
-        }
-        const args = postData.split('&');
-        return args.reduce((acc, arg) => {
-            const [key, val] = decodeURIComponent(arg).split('=');
-            return Object.assign(acc, { [key]: val });
-        }, {});
-    }
     login() {
         return __awaiter(this, void 0, void 0, function* () {
             if (this.basicAuth) {
@@ -90,8 +96,10 @@ class AWSSamlLogin {
                 const password = readline_sync_1.default.question('password: ', { hideEchoBack: true });
                 this.basicCreds = { username, password };
             }
-            const browser = yield puppeteer_1.default.launch({
+            const browser = yield puppeteer_core_1.default.launch({
+                product: "chrome",
                 headless: (this.basicAuth ? true : false),
+                executablePath: '/usr/bin/google-chrome-stable'
             });
             const pages = yield browser.pages();
             const page = pages[0];
@@ -112,9 +120,10 @@ class AWSSamlLogin {
                         });
                         let roleMatch;
                         if (this.roleArn && this.roleArn.length) {
-                            roleMatch = roles.find(r => r.role === this.roleArn);
-                            if (!roleMatch)
-                                console.log(`${this.roleArn} not an available role.`);
+                            roleMatch = roles.find((r) => r.role === this.roleArn);
+                            if (!roleMatch) {
+                                console.log(`"${this.roleArn}" not an available role.`);
+                            }
                         }
                         if (roleMatch) {
                             this.role = roleMatch.role;

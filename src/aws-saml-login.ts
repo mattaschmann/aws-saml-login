@@ -2,7 +2,7 @@ import colors from 'colors/safe'
 import fs from 'fs'
 import ini from 'ini'
 import os from 'os'
-import puppeteer from 'puppeteer'
+import puppeteer from 'puppeteer-core'
 import readline from 'readline-sync'
 import {Command} from 'commander'
 import {STS} from 'aws-sdk'
@@ -42,6 +42,13 @@ class AWSSamlLogin {
   private roleArn: string = ''
 
   constructor(args: string[]) {
+    program.exitOverride((err) => {
+      if (err.code === 'commander.missingArgument') {
+        program.outputHelp();
+      }
+      process.exit(err.exitCode);
+    })
+
     program
       .version(pjson.version)
       .description(pjson.description)
@@ -93,13 +100,16 @@ class AWSSamlLogin {
     }
 
     const browser = await puppeteer.launch({
+      product: "chrome",
       headless: (this.basicAuth ? true : false),
+      executablePath: '/usr/bin/google-chrome-stable'
     })
 
     const pages = await browser.pages()
     const page = pages[0]
 
     await page.setRequestInterception(true)
+
     page.on('request', async (req) => {
 
       const post = AWSSamlLogin.parsePost(req.postData())
@@ -156,7 +166,7 @@ class AWSSamlLogin {
             RoleArn: this.role,
             SAMLAssertion: post.SAMLResponse,
           }).promise()
-        } catch (err) {
+        } catch (err: any) {
           console.log('\n' + colors.red(err.code))
           console.log(err.message)
           console.log('see: https://docs.aws.amazon.com/AWSJavaScriptSDK/latest/AWS/STS.html#assumeRoleWithSAML-property')
@@ -233,7 +243,7 @@ class AWSSamlLogin {
         page.authenticate(this.basicCreds)
       }
       await page.goto(this.loginUrl, {timeout: 0})
-    } catch (err) {
+    } catch (err: any) {
       if (
         // Always happens if basic auth is not set
         err.message.startsWith('net::ERR_INVALID_AUTH_CREDENTIALS') ||

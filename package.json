@@ -1,6 +1,6 @@
 {
   "name": "aws-saml-login",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "A simple cli utility to get temporary AWS credentials via a SAML endpoint",
   "main": "./dist/index.js",
   "bin": {
@@ -23,19 +23,18 @@
     "node": ">=10.12.0"
   },
   "dependencies": {
-    "aws-sdk": "2.902.0",
+    "aws-sdk": "2.1653.0",
     "colors": "1.4.0",
-    "commander": "7.2.0",
-    "ini": "2.0.0",
-    "puppeteer": "9.1.1",
+    "commander": "12.1.0",
+    "ini": "4.1.3",
+    "puppeteer-core": "22.12.1",
     "readline-sync": "1.4.10"
   },
   "devDependencies": {
-    "@types/ini": "1.3.30",
-    "@types/puppeteer-core": "5.4.0",
-    "@types/readline-sync": "1.4.3",
-    "ts-node": "9.1.1",
+    "@types/ini": "4.1.1",
+    "@types/readline-sync": "1.4.8",
+    "ts-node": "10.9.2",
     "tslint": "5.20.1",
-    "typescript": "4.2.4"
+    "typescript": "5.5.3"
   }
 }
