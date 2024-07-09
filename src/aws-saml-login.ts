@@ -40,11 +40,11 @@ class AWSSamlLogin {
   private refresh: string
   private role: string = ''
   private roleArn: string = ''
+  private chromePath: string = ''
+  private awsRegion: string = ''
 
   constructor(args: string[]) {
     program.exitOverride((err) => {
-      // @Matt DEBUG
-      debugger
       if (err.code === 'commander.missingArgument' && !program.opts().refresh) {
         program.outputHelp();
       }
@@ -65,6 +65,8 @@ class AWSSamlLogin {
                               in "~/.config/aws-saml-login/config".  Will create the entry if it
                               does not exist.\n`)
       .option('-a, --role_arn <role_arn>', `role ARN to login as`)
+      .option('-c, --chrome_path <path>', `System path to chrome executable`)
+      .option('-n, --aws_region <region>', `AWS Region`)
       .arguments('[login_url]')
     program.parse(args)
 
@@ -79,21 +81,48 @@ class AWSSamlLogin {
     this.profile = program.opts().profile
     this.refresh = program.opts().refresh
     this.roleArn = program.opts().role_arn
+    this.chromePath = program.opts().chrome_path
+    this.awsRegion = program.opts().aws_region
 
-    if (this.refresh) {
-      this.profile = this.refresh
-      if (fs.existsSync(CONFIG_FILE)) {
-        this.config = ini.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'))
+    if (fs.existsSync(CONFIG_FILE)) {
+      this.config = ini.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'))
+
+      if (!this.chromePath) {
+        this.chromePath = this.config.chromePath || readline.question('\nPath to chrome executable: ')
+      }
+      if (this.config.chromePath !== this.chromePath) {
+        this.config.chromePath = this.chromePath
+        saveConfig(this.config)
+        console.log(`\nChrome path "${colors.green(this.chromePath)}" stored in "${colors.yellow(CONFIG_FILE)}" for future reference`)
+      }
+
+      if (!this.awsRegion) {
+        this.awsRegion = this.config.awsRegion || readline.question('\nAWS Region: ')
+      }
+      if (this.config.awsRegion !== this.awsRegion) {
+        this.config.awsRegion = this.awsRegion
+        saveConfig(this.config)
+        console.log(`\nAWS Region "${colors.green(this.awsRegion)}" stored in "${colors.yellow(CONFIG_FILE)}" for future reference`)
+      }
+
+
+      if (this.refresh) {
+        this.profile = this.refresh
         this.profileConfig = this.config[this.refresh] || {}
         this.loginUrl = this.profileConfig.loginUrl
         this.role = this.profileConfig.role
         this.principal = this.profileConfig.principal
-      }
 
-      if (!this.loginUrl) {
-        this.loginUrl = readline.question('\nLogin URL: ')
+        if (!this.loginUrl) {
+          this.loginUrl = readline.question('\nLogin URL: ')
+        }
+
       }
+    } else {
+      console.log("Couldn't load the config file")
+      process.exit(1)
     }
+
   }
 
   public async login() {
@@ -107,8 +136,7 @@ class AWSSamlLogin {
     const browser = await puppeteer.launch({
       product: "chrome",
       headless: (this.basicAuth ? true : false),
-      // @Matt TODO: come from config/arg
-      executablePath: '/usr/bin/google-chrome-stable',
+      executablePath: this.chromePath,
       // @Matt TODO: userDataDir
     })
 
@@ -164,7 +192,9 @@ class AWSSamlLogin {
           }
         }
 
-        const client = new sts.STSClient()
+        const client = new sts.STSClient({
+          region: this.awsRegion
+        })
         const command = new sts.AssumeRoleWithSAMLCommand({
           DurationSeconds: this.duration,
           PrincipalArn: this.principal,
@@ -227,20 +257,19 @@ class AWSSamlLogin {
         console.log('\nRemember to update your region information in "~/.aws/config"')
         console.log('see: https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html')
 
-        // Write to config if we are refreshing
+        // Write profile to config
         if (this.refresh) {
           this.config[this.refresh] = {
             loginUrl: this.loginUrl,
             principal: this.principal,
             role: this.role,
           }
-          if (!fs.existsSync(CONFIG_FILE_PATH)) {
-            fs.mkdirSync(CONFIG_FILE_PATH, {recursive: true})
-          }
-          fs.writeFileSync(CONFIG_FILE, ini.stringify(this.config))
 
+          saveConfig(this.config)
           console.log(`\nProfile information stored in "${colors.yellow(CONFIG_FILE)}" for future reference`)
         }
+
+
       }
 
       req.continue()
@@ -266,6 +295,13 @@ class AWSSamlLogin {
       process.exit(1)
     }
   }
+}
+
+function saveConfig(config: Object) {
+  if (!fs.existsSync(CONFIG_FILE_PATH)) {
+    fs.mkdirSync(CONFIG_FILE_PATH, {recursive: true})
+  }
+  fs.writeFileSync(CONFIG_FILE, ini.stringify(config))
 }
 
 export default AWSSamlLogin
