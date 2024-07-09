@@ -5,9 +5,27 @@ and allowing the user to login, it will intercept the `SAMLResponse` and make a
 call to Amazon STS to get temporary credentials.  These can then be used via the
 [AWS profiles feature](https://docs.aws.amazon.com/cli/latest/userguide/cli-configure-profiles.html).
 
+NOTE: This has been tested with Microsoft Edge and works, any chromium based
+browser is likely to work.
+
+## Requirements
+- NodeJS v18 or above
+
+## Config Files
+This utility will create/update two config files:
+1. `~/.aws/credentials`
+  The location of the AWS Profile credentials.  It will update specifically
+  named profiles only.
+
+1. `~/.config/aws-saml-login/config`
+  The configuration for this utility.  It will save info for the `--refresh`
+  option to streamline the login of commonly used profiles, as well as info on
+  which browser you choose to use and the AWS Region.
+
 ## Install
 ```shell
-$ npm install -g aws-saml-login
+$ npm pack
+$ npm i -g <tgz file created from previous command>
 ```
 
 ## Usage
