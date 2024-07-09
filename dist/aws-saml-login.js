@@ -70,14 +70,6 @@ class AWSSamlLogin {
         this.roleArn = '';
         this.chromePath = '';
         this.awsRegion = '';
-        program.exitOverride((err) => {
-            if (err.code === 'commander.missingArgument' && !program.opts().refresh) {
-                program.outputHelp();
-            }
-            if (!program.opts().refresh) {
-                process.exit(err.exitCode);
-            }
-        });
         program
             .version(pjson.version)
             .description(pjson.description)
@@ -107,37 +99,33 @@ class AWSSamlLogin {
         this.awsRegion = program.opts().aws_region;
         if (fs_1.default.existsSync(CONFIG_FILE)) {
             this.config = ini_1.default.parse(fs_1.default.readFileSync(CONFIG_FILE, 'utf-8'));
-            if (!this.chromePath) {
-                this.chromePath = this.config.chromePath || readline_sync_1.default.question('\nPath to chrome executable: ');
-            }
-            if (this.config.chromePath !== this.chromePath) {
-                this.config.chromePath = this.chromePath;
-                saveConfig(this.config);
-                console.log(`\nChrome path "${safe_1.default.green(this.chromePath)}" stored in "${safe_1.default.yellow(CONFIG_FILE)}" for future reference`);
-            }
-            if (this.refresh) {
-                this.profile = this.refresh;
-                this.profileConfig = this.config[this.refresh] || {};
-                this.loginUrl = this.profileConfig.loginUrl;
-                this.role = this.profileConfig.role;
-                this.principal = this.profileConfig.principal;
-                this.awsRegion = this.profileConfig.awsRegion || this.awsRegion || readline_sync_1.default.question('\nAWS Region: ');
-                if (!this.loginUrl) {
-                    this.loginUrl = readline_sync_1.default.question('\nLogin URL: ');
-                }
-            }
-            if (!this.awsRegion) {
-                this.awsRegion = this.config.awsRegion || readline_sync_1.default.question('\nAWS Region: ');
-            }
-            if (this.config.awsRegion !== this.awsRegion) {
-                this.config.awsRegion = this.awsRegion;
-                saveConfig(this.config);
-                console.log(`\nAWS Region "${safe_1.default.green(this.awsRegion)}" stored in "${safe_1.default.yellow(CONFIG_FILE)}" for future reference`);
+        }
+        if (!this.chromePath) {
+            this.chromePath = this.config.chromePath || readline_sync_1.default.question('\nPath to chrome executable: ');
+        }
+        if (this.config.chromePath !== this.chromePath) {
+            this.config.chromePath = this.chromePath;
+            saveConfig(this.config);
+            console.log(`\nChrome path "${safe_1.default.green(this.chromePath)}" stored in "${safe_1.default.yellow(CONFIG_FILE)}" for future reference`);
+        }
+        if (this.refresh) {
+            this.profile = this.refresh;
+            this.profileConfig = this.config[this.refresh] || {};
+            this.loginUrl = this.profileConfig.loginUrl;
+            this.role = this.profileConfig.role;
+            this.principal = this.profileConfig.principal;
+            this.awsRegion = this.profileConfig.awsRegion || this.awsRegion || readline_sync_1.default.question('\nAWS Region: ');
+            if (!this.loginUrl) {
+                this.loginUrl = readline_sync_1.default.question('\nLogin URL: ');
             }
         }
-        else {
-            console.log("Couldn't load the config file");
-            process.exit(1);
+        if (!this.awsRegion) {
+            this.awsRegion = this.config.awsRegion || readline_sync_1.default.question('\nAWS Region: ');
+        }
+        if (this.config.awsRegion !== this.awsRegion) {
+            this.config.awsRegion = this.awsRegion;
+            saveConfig(this.config);
+            console.log(`\nAWS Region "${safe_1.default.green(this.awsRegion)}" stored in "${safe_1.default.yellow(CONFIG_FILE)}" for future reference`);
         }
     }
     login() {

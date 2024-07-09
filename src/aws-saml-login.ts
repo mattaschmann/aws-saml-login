@@ -76,44 +76,40 @@ class AWSSamlLogin {
 
     if (fs.existsSync(CONFIG_FILE)) {
       this.config = ini.parse(fs.readFileSync(CONFIG_FILE, 'utf-8'))
-
-      if (!this.chromePath) {
-        this.chromePath = this.config.chromePath || readline.question('\nPath to chrome executable: ')
-      }
-      if (this.config.chromePath !== this.chromePath) {
-        this.config.chromePath = this.chromePath
-        saveConfig(this.config)
-        console.log(`\nChrome path "${colors.green(this.chromePath)}" stored in "${colors.yellow(CONFIG_FILE)}" for future reference`)
-      }
-
-      if (this.refresh) {
-        this.profile = this.refresh
-        this.profileConfig = this.config[this.refresh] || {}
-        this.loginUrl = this.profileConfig.loginUrl
-        this.role = this.profileConfig.role
-        this.principal = this.profileConfig.principal
-        this.awsRegion = this.profileConfig.awsRegion || this.awsRegion || readline.question('\nAWS Region: ')
-
-        if (!this.loginUrl) {
-          this.loginUrl = readline.question('\nLogin URL: ')
-        }
-
-      }
-
-      if (!this.awsRegion) {
-        this.awsRegion = this.config.awsRegion || readline.question('\nAWS Region: ')
-      }
-      if (this.config.awsRegion !== this.awsRegion) {
-        this.config.awsRegion = this.awsRegion
-        saveConfig(this.config)
-        console.log(`\nAWS Region "${colors.green(this.awsRegion)}" stored in "${colors.yellow(CONFIG_FILE)}" for future reference`)
-      }
-
-
-    } else {
-      console.log("Couldn't load the config file")
-      process.exit(1)
     }
+
+    if (!this.chromePath) {
+      this.chromePath = this.config.chromePath || readline.question('\nPath to chrome executable: ')
+    }
+    if (this.config.chromePath !== this.chromePath) {
+      this.config.chromePath = this.chromePath
+      saveConfig(this.config)
+      console.log(`\nChrome path "${colors.green(this.chromePath)}" stored in "${colors.yellow(CONFIG_FILE)}" for future reference`)
+    }
+
+    if (this.refresh) {
+      this.profile = this.refresh
+      this.profileConfig = this.config[this.refresh] || {}
+      this.loginUrl = this.profileConfig.loginUrl
+      this.role = this.profileConfig.role
+      this.principal = this.profileConfig.principal
+      this.awsRegion = this.profileConfig.awsRegion || this.awsRegion || readline.question('\nAWS Region: ')
+
+      if (!this.loginUrl) {
+        this.loginUrl = readline.question('\nLogin URL: ')
+      }
+
+    }
+
+    if (!this.awsRegion) {
+      this.awsRegion = this.config.awsRegion || readline.question('\nAWS Region: ')
+    }
+    if (this.config.awsRegion !== this.awsRegion) {
+      this.config.awsRegion = this.awsRegion
+      saveConfig(this.config)
+      console.log(`\nAWS Region "${colors.green(this.awsRegion)}" stored in "${colors.yellow(CONFIG_FILE)}" for future reference`)
+    }
+
 
   }
 
