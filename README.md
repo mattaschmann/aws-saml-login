@@ -24,8 +24,9 @@ This utility will create/update two config files:
 
 ## Install
 ```shell
+$ npm install
 $ npm pack
-$ npm i -g <tgz file created from previous command>
+$ npm install -g <tgz file created from previous command>
 ```
 
 ## Usage
